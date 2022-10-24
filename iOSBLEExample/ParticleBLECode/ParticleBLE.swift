@@ -1,5 +1,13 @@
+//
+//  ParticleBLE.swift
+//  iOSBLEExample
+//
+//  Created by Nick Lambourne on 10/20/22.
+//
+
 import Foundation
 import CoreBluetooth
+import NIOCore
 
 protocol ParticleBLEDelegate {
     func statusUpdated()
@@ -7,7 +15,7 @@ protocol ParticleBLEDelegate {
 
 class ParticleBLE: NSObject {
     
-    enum SetupState {
+    enum BLEState: String, Codable {
         case idle
         case waitingForUserInput
         case lookingForDevice
@@ -17,22 +25,43 @@ class ParticleBLE: NSObject {
         case connectedAndWaitingForVersion
         case connectedAndRunning
     }
-    var setupState: SetupState = .idle
-    
-    var deviceAdvertisingName = "aabbcc"
-    var setupCode = "sdfsdf" //should read from the manufacturing data?
-    var mobileSecret = "sdfsdf" //from the QR code
+    var bleState: BLEState = .idle
 
     var timer = Timer()
     var timerRunning: Bool = false
     var timerRunTime: Int = 0
     var bleScanning: Bool = false
     
+    var lastWifiAPsSeen: [Particle_Ctrl_Wifi_ScanNetworksReply.Network] = []
+    
+    var currentConnectedAP: Particle_Ctrl_Wifi_GetCurrentNetworkReply = Particle_Ctrl_Wifi_GetCurrentNetworkReply()
+    
+    //this is the header for the BLE protocol
+    let REQUEST_PACKET_OVERHEAD: Int = 8
+    
+    let ECHO_REQUEST_TYPE: UInt16 = 1
+    let SCAN_NETWORKS_TYPE: UInt16 = 506
+    let JOIN_KNOWN_NETWORK_TYPE: UInt16 = 500
+    let GET_CURRENT_NETWORK_TYPE: UInt16 = 505
+    
+    struct ReceivingData {
+        var reqID: UInt16
+        var dataLength: UInt16
+        var buf: ByteBuffer!
+    }
+    
+    var receivingData: ReceivingData? = nil
+    
     enum ParticleBLEState {
         case Inactive
         case Active
         case Passed
         case Failed
+    }
+    
+    struct Message {
+        var reqID: UInt16
+        var payload: [UInt8]
     }
 
     //The bluetooth bits
@@ -50,11 +79,23 @@ class ParticleBLE: NSObject {
     var txCharacteristic: CBCharacteristic?
     var versionCharacteristic: CBCharacteristic?
     
+    var reqIDToTypeDict: [UInt16: UInt16] = [:]
+    var nextReqID: UInt16 = 0
+    
+    //device details
+    var bleName: String = ""
+    var mobileSecret: String = ""
+    
     //delegate list
     var delegates:[ParticleBLEDelegate] = []
 
     func startup() {
         centralManager = CBCentralManager(delegate: self, queue: nil)
+    }
+    
+    func setDeviceDetails(bleName: String, mobileSecret: String) {
+        self.bleName = bleName
+        self.mobileSecret = mobileSecret
     }
 
     func registerDelegate( delegate: ParticleBLEDelegate ) {
@@ -68,12 +109,12 @@ class ParticleBLE: NSObject {
         }
     }
     
-    func updateState( state: SetupState ) {
+    func updateState( state: BLEState ) {
         
         print("updateState(\(state))")
         
         //gotta be a new state, right?
-        assert(self.setupState != state)
+        assert(self.bleState != state)
         
         var runTimer: Bool = false
         var resetTimeout: Bool = false
@@ -146,7 +187,7 @@ class ParticleBLE: NSObject {
         bleScanning = scanBLE
         
         //store the new state
-        self.setupState = state
+        self.bleState = state
         
         //inform the delegates!
         informDelegates()
@@ -157,7 +198,7 @@ class ParticleBLE: NSObject {
         
         print("updateTimer\(timerRunTime)")
 
-        switch self.setupState {
+        switch self.bleState {
             case .lookingForDevice:
                 if timerRunTime > 60 {
                     self.updateState(state: .lookingForDeviceTimeout)
@@ -198,35 +239,26 @@ extension ParticleBLE: CBCentralManagerDelegate {
         }
     }
 
-    func getManufacturingData( advertisementData: [String: Any] ) throws -> (match: Bool, companyID: UInt16, platformID: UInt16, setupCode: String) {
-
+    func getManufacturingData( advertisementData: [String: Any] ) throws -> (companyID: UInt16, platformID: UInt16, setupCode: String) {
         //did we find our peripheral? our peripheral has manufacturing data!
         if let manufacturerData = advertisementData["kCBAdvDataManufacturerData"] as? Data {
-            assert(manufacturerData.count >= (2 + 2 + 6))
+            assert(manufacturerData.count == (2 + 2 + 6))
             
-            let companyID = UInt16(manufacturerData[0]) + UInt16(manufacturerData[1]) << 8
+            let allocator = ByteBufferAllocator()
+            var buf: ByteBuffer! = nil
+            buf = allocator.buffer(capacity: manufacturerData.count)
+            buf.writeBytes(Array(manufacturerData))
+            
+            let companyID: UInt16 = buf.readInteger(endianness: .little)!
             print("companyID", String(format: "%04X", companyID))
             
-            let platformID = UInt16(manufacturerData[2]) + UInt16(manufacturerData[3]) << 8
+            let platformID: UInt16 = buf.readInteger(endianness: .little)!
             print("platformID", String(format: "%04X", platformID))
             
-            var setupCode = ""
+            let setupCode: String = buf.readString(length: 6)!
+            print("setupCode: \(setupCode)")
             
-            if let manufacturerDataString = advertisementData["kCBAdvDataManufacturerData"] as? String {
-                
-                let start = manufacturerDataString.index(manufacturerDataString.startIndex, offsetBy: 4)
-                let end = manufacturerDataString.index(manufacturerDataString.startIndex, offsetBy: 9)
-                let range = start...end
-                let newString = String(manufacturerDataString[range])
-                
-                setupCode = newString
-                print("setupCode", setupCode)
-            }
-            
-            //in theory, check the company id or something?
-            var match: Bool = true
-            
-            return (match, companyID, platformID, setupCode )
+            return (companyID, platformID, setupCode )
         }
         
         assert( false )
@@ -239,15 +271,19 @@ extension ParticleBLE: CBCentralManagerDelegate {
         do {
             guard let name = peripheral.name else { return }
             
-            if name.contains(deviceAdvertisingName) {
+            if name.contains(bleName) {
                 do {
-                    let (match, companyID, platformID, setupCode) = try getManufacturingData( advertisementData: advertisementData )
+                    let (companyID, platformID, setupCode) = try getManufacturingData( advertisementData: advertisementData )
+                    
+                    //check the companyID ?
+                    assert(companyID == 0x1234)
+                    assert(platformID == 0x0020)
                 }
                 catch {
                     
                 }
                 
-                if( self.setupState == .lookingForDevice ) {
+                if( self.bleState == .lookingForDevice ) {
                     self.peripheral = peripheral
         
                     self.centralManager.connect(self.peripheral!)
@@ -299,9 +335,13 @@ extension ParticleBLE: CBPeripheralDelegate {
         if versionCharacteristic != nil {
             //read the version
             peripheral.readValue(for: versionCharacteristic!)
-            if setupState == .connectingToDevice {
+            if bleState == .connectingToDevice {
                 self.updateState(state: .connectedAndWaitingForVersion)
             }
+        }
+        
+        if txCharacteristic != nil {
+            peripheral.setNotifyValue(true, for: txCharacteristic!)
         }
     }
     
@@ -319,18 +359,175 @@ extension ParticleBLE: CBPeripheralDelegate {
             print("Version Data: \(characteristic.value![0])")
             
             //we should check the version above, but for now assume its 2
-            if setupState == .connectedAndWaitingForVersion {
+            if bleState == .connectedAndWaitingForVersion {
                 self.updateState(state: .connectedAndRunning)
+            }
+        }
+        else if characteristic.uuid == txUUID {
+            //decode
+            if let data = characteristic.value {
+                let (messageValid, receivedMsg) = decodePacket(buffer: Array(data))
+
+                if messageValid {
+                    //get request type
+                    let type = reqIDToTypeDict[receivedMsg!.reqID]
+                    
+                    if type == ECHO_REQUEST_TYPE {
+                        //echo
+                        let str = String(decoding: receivedMsg!.payload, as: UTF8.self)
+                        print("Received echo: \(str)")
+                        
+                    } else if type == SCAN_NETWORKS_TYPE {
+                        do {
+                            let scannedNetworks: Particle_Ctrl_Wifi_ScanNetworksReply = try Particle_Ctrl_Wifi_ScanNetworksReply(serializedData: Data(receivedMsg!.payload))
+                            
+                            //print out what we found
+                            for network in scannedNetworks.networks {
+                                print("\(network.ssid) \(network.rssi)")
+                            }
+                            
+                            self.lastWifiAPsSeen = scannedNetworks.networks
+                        }
+                        catch {
+                            
+                        }
+                        
+                        informDelegates()
+                    } else if type == JOIN_KNOWN_NETWORK_TYPE {
+                        do {
+                            let joinNetworkReply: Particle_Ctrl_Wifi_JoinNewNetworkReply = try Particle_Ctrl_Wifi_JoinNewNetworkReply(serializedData: Data(receivedMsg!.payload))
+                        }
+                        catch {
+                            
+                        }
+
+                        informDelegates()
+                    } else if type == GET_CURRENT_NETWORK_TYPE {
+                        do {
+                            let currentNetworkReply: Particle_Ctrl_Wifi_GetCurrentNetworkReply = try Particle_Ctrl_Wifi_GetCurrentNetworkReply(serializedData: Data(receivedMsg!.payload))
+                            
+                            currentConnectedAP = currentNetworkReply
+                        }
+                        catch {
+                            
+                        }
+
+                        informDelegates()
+                    }
+                }
             }
         }
     }
     
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         print("didWriteValueFor(\(characteristic)")
+    }
+    
+    func requestWiFiAPs() {
+        sendPacket(type: SCAN_NETWORKS_TYPE, data: [] )
+    }
+    
+    func requestJoinWiFiNetwork(network: Particle_Ctrl_Wifi_ScanNetworksReply.Network, password: String) {
+        var joinNetworkRequest = Particle_Ctrl_Wifi_JoinNewNetworkRequest()
         
-        if characteristic.uuid == txUUID {
-            //decode
+        joinNetworkRequest.ssid = network.ssid
+        joinNetworkRequest.security = network.security
+        joinNetworkRequest.credentials.password = password
+        joinNetworkRequest.credentials.type = .password
+        joinNetworkRequest.bssid = network.bssid
+
+        do {
+            try sendPacket(type: JOIN_KNOWN_NETWORK_TYPE, data: Array(joinNetworkRequest.serializedData()) )
         }
+        catch {
+            
+        }
+    }
+    
+    func requestCurrentNetwork() {
+        sendPacket(type: GET_CURRENT_NETWORK_TYPE, data: [] )
+    }
+    
+    func requestEcho() {
+        //send a test packet
+        let string = "hello"
+        let dataToSend: [UInt8] = Array(string.utf8)
+        
+        sendPacket(type: ECHO_REQUEST_TYPE, data: dataToSend )
+    }
+    
+    func sendPacket(type: UInt16, data: [UInt8]) {
+        
+        let reqID: UInt16 = nextReqID
+        nextReqID += 1
+        reqIDToTypeDict[reqID] = type
+
+        print("Send packet: \(reqID), \(type), \(data.count)")
+        
+        let reserved: UInt16 = 0
+        
+        let allocator = ByteBufferAllocator()
+        var buf: ByteBuffer! = nil
+        
+        buf = allocator.buffer(capacity: data.count + REQUEST_PACKET_OVERHEAD)
+        buf.writeInteger(UInt16(data.count), endianness: .little)
+        buf.writeInteger(reqID, endianness: .little)
+        buf.writeInteger(type, endianness: .little)
+        buf.writeInteger(reserved, endianness: .little)
+        buf.writeBytes(data)
+        
+        peripheral?.writeValue(Data(buf.getBytes(at: 0, length: buf.readableBytes) ?? []), for: rxCharacteristic!, type: .withoutResponse)
+    }
+    
+    func decodePacket(buffer: [UInt8]) -> ( messageOK: Bool, receivedMsg: Message? ) {
+        print("decodePacket \(buffer.count)")
+
+        let startPacket: Bool = (receivingData == nil)
+        
+        var workingBuffer: [UInt8] = buffer
+        
+        if startPacket {
+            //get the header etc...
+            let allocator = ByteBufferAllocator()
+            var buf: ByteBuffer! = nil
+            buf = allocator.buffer(capacity: buffer.count)
+            buf.writeBytes(buffer)
+            
+            let dataLength: UInt16 = buf.readInteger(endianness: .little)!
+            let reqID: UInt16 = buf.readInteger(endianness: .little)!
+            let _: UInt16 = buf.readInteger(endianness: .little)!
+            let _: UInt16 = buf.readInteger(endianness: .little)!
+            
+            //free the buf above?
+            
+            //remove the first 8 bytes from the buffer
+            workingBuffer = Array(workingBuffer[REQUEST_PACKET_OVERHEAD...])
+            
+            //create the receiving buffer
+            var recBuf: ByteBuffer! = nil
+            recBuf = allocator.buffer(capacity: Int(dataLength))
+
+            receivingData = ReceivingData(reqID: reqID, dataLength: dataLength, buf: recBuf)
+        }
+
+        //write the received data in to the buffer
+        receivingData!.buf.writeBytes(workingBuffer)
+        
+        //message?
+        var returnMessage: Message? = nil
+        
+        //anything left to receive?
+        let bytesLeftToReceive = receivingData!.dataLength - UInt16(receivingData!.buf.readableBytes)
+        
+        print("Receive packet: \(bytesLeftToReceive)")
+        
+        //reset the buffer if nothing left to received
+        if bytesLeftToReceive == 0 {
+            returnMessage = Message(reqID: receivingData!.reqID, payload: receivingData!.buf.getBytes(at: 0, length: receivingData!.buf.readableBytes) ?? [])
+            receivingData = nil
+        }
+
+        return ( bytesLeftToReceive == 0, returnMessage )
     }
 }
 
