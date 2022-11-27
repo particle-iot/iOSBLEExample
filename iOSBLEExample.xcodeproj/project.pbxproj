@@ -11,7 +11,7 @@
 		B401AA3D29022A1200C4B877 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B401AA3C29022A1200C4B877 /* ContentView.swift */; };
 		B401AA3F29022A1400C4B877 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B401AA3E29022A1400C4B877 /* Assets.xcassets */; };
 		B401AA4229022A1400C4B877 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B401AA4129022A1400C4B877 /* Preview Assets.xcassets */; };
-		B401AA4929022B7500C4B877 /* ParticleBLE.swift in Sources */ = {isa = PBXBuildFile; fileRef = B401AA4829022B7500C4B877 /* ParticleBLE.swift */; };
+		B401AA4929022B7500C4B877 /* ParticleBLEInterface.swift in Sources */ = {isa = PBXBuildFile; fileRef = B401AA4829022B7500C4B877 /* ParticleBLEInterface.swift */; };
 		B401AA4C29023FC500C4B877 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = B401AA4B29023FC500C4B877 /* SwiftProtobuf */; };
 		B401AA4E29023FC500C4B877 /* SwiftProtobufPluginLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = B401AA4D29023FC500C4B877 /* SwiftProtobufPluginLibrary */; };
 		B401AA5029023FC500C4B877 /* protoc-gen-swift in Frameworks */ = {isa = PBXBuildFile; productRef = B401AA4F29023FC500C4B877 /* protoc-gen-swift */; };
@@ -20,7 +20,7 @@
 		B43F42ED2903C6D20027B989 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = B43F42EC2903C6D20027B989 /* CodeScanner */; };
 		B43F42EF2903C99A0027B989 /* QRScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43F42EE2903C99A0027B989 /* QRScanner.swift */; };
 		B43F42F12903CD4E0027B989 /* SetupWiFi.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43F42F02903CD4E0027B989 /* SetupWiFi.swift */; };
-		B43F42F32903D8A60027B989 /* ParticleBLEObservable.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43F42F22903D8A60027B989 /* ParticleBLEObservable.swift */; };
+		B43F42F32903D8A60027B989 /* BLEObservable.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43F42F22903D8A60027B989 /* BLEObservable.swift */; };
 		B4B6089D290369CE00DBE6DF /* cloud.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B60890290369CD00DBE6DF /* cloud.pb.swift */; };
 		B4B6089E290369CE00DBE6DF /* nanopb.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B60891290369CD00DBE6DF /* nanopb.pb.swift */; };
 		B4B6089F290369CE00DBE6DF /* network.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B60892290369CD00DBE6DF /* network.pb.swift */; };
@@ -35,7 +35,28 @@
 		B4B608A8290369CE00DBE6DF /* internal.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B6089B290369CE00DBE6DF /* internal.pb.swift */; };
 		B4B608A9290369CE00DBE6DF /* storage.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4B6089C290369CE00DBE6DF /* storage.pb.swift */; };
 		B4B608B3290377F000DBE6DF /* mbedTLS in Frameworks */ = {isa = PBXBuildFile; productRef = B4B608B2290377F000DBE6DF /* mbedTLS */; };
+		B4BA9D672931590400E838E9 /* HMACSha256.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BA9D662931590400E838E9 /* HMACSha256.swift */; };
+		B4BA9D6F2931665F00E838E9 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BA9D6E2931665F00E838E9 /* main.swift */; };
+		B4BA9D75293166EB00E838E9 /* libmbedtls in Frameworks */ = {isa = PBXBuildFile; productRef = B4BA9D74293166EB00E838E9 /* libmbedtls */; };
+		B4BA9D762931680900E838E9 /* ECJPake.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43F42E429038CF70027B989 /* ECJPake.swift */; };
+		B4BA9D772931680900E838E9 /* HMACSha256.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BA9D662931590400E838E9 /* HMACSha256.swift */; };
+		B4BA9D792933B47B00E838E9 /* ParticleBLEProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BA9D782933B47B00E838E9 /* ParticleBLEProtocol.swift */; };
+		B4BA9D892933DE7200E838E9 /* NIOCore in Frameworks */ = {isa = PBXBuildFile; productRef = B4BA9D882933DE7200E838E9 /* NIOCore */; };
+		B4BA9D8B2933DE7800E838E9 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = B4BA9D8A2933DE7800E838E9 /* SwiftProtobuf */; };
+		B4BA9D8D2933E86800E838E9 /* ParticleBLEInterfaceAbstract.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4BA9D8C2933E86800E838E9 /* ParticleBLEInterfaceAbstract.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B4BA9D6A2931665F00E838E9 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = /usr/share/man/man1/;
+			dstSubfolderSpec = 0;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		B401AA3729022A1200C4B877 /* iOSBLEExample.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iOSBLEExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -43,12 +64,12 @@
 		B401AA3C29022A1200C4B877 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B401AA3E29022A1400C4B877 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B401AA4129022A1400C4B877 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		B401AA4829022B7500C4B877 /* ParticleBLE.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBLE.swift; sourceTree = "<group>"; };
+		B401AA4829022B7500C4B877 /* ParticleBLEInterface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBLEInterface.swift; sourceTree = "<group>"; };
 		B43F42E3290384F50027B989 /* mbedTLS-iOS */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "mbedTLS-iOS"; path = "../../mbedTLS-iOS"; sourceTree = "<group>"; };
 		B43F42E429038CF70027B989 /* ECJPake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ECJPake.swift; sourceTree = "<group>"; };
 		B43F42EE2903C99A0027B989 /* QRScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScanner.swift; sourceTree = "<group>"; };
 		B43F42F02903CD4E0027B989 /* SetupWiFi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupWiFi.swift; sourceTree = "<group>"; };
-		B43F42F22903D8A60027B989 /* ParticleBLEObservable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBLEObservable.swift; sourceTree = "<group>"; };
+		B43F42F22903D8A60027B989 /* BLEObservable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEObservable.swift; sourceTree = "<group>"; };
 		B4B60890290369CD00DBE6DF /* cloud.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = cloud.pb.swift; sourceTree = "<group>"; };
 		B4B60891290369CD00DBE6DF /* nanopb.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = nanopb.pb.swift; sourceTree = "<group>"; };
 		B4B60892290369CD00DBE6DF /* network.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = network.pb.swift; sourceTree = "<group>"; };
@@ -62,6 +83,12 @@
 		B4B6089A290369CE00DBE6DF /* wifi.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = wifi.pb.swift; sourceTree = "<group>"; };
 		B4B6089B290369CE00DBE6DF /* internal.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = internal.pb.swift; sourceTree = "<group>"; };
 		B4B6089C290369CE00DBE6DF /* storage.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = storage.pb.swift; sourceTree = "<group>"; };
+		B4BA9D662931590400E838E9 /* HMACSha256.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HMACSha256.swift; sourceTree = "<group>"; };
+		B4BA9D6C2931665F00E838E9 /* ecjpake_test */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ecjpake_test; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4BA9D6E2931665F00E838E9 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B4BA9D782933B47B00E838E9 /* ParticleBLEProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBLEProtocol.swift; sourceTree = "<group>"; };
+		B4BA9D8C2933E86800E838E9 /* ParticleBLEInterfaceAbstract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParticleBLEInterfaceAbstract.swift; sourceTree = "<group>"; };
+		B4BA9D8F293465BF00E838E9 /* ecjpake_test.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ecjpake_test.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +105,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B4BA9D692931665F00E838E9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4BA9D892933DE7200E838E9 /* NIOCore in Frameworks */,
+				B4BA9D75293166EB00E838E9 /* libmbedtls in Frameworks */,
+				B4BA9D8B2933DE7800E838E9 /* SwiftProtobuf in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -85,7 +122,9 @@
 			isa = PBXGroup;
 			children = (
 				B401AA3929022A1200C4B877 /* iOSBLEExample */,
+				B4BA9D6D2931665F00E838E9 /* mac_test_app */,
 				B401AA3829022A1200C4B877 /* Products */,
+				B4BA9D73293166EB00E838E9 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -93,6 +132,7 @@
 			isa = PBXGroup;
 			children = (
 				B401AA3729022A1200C4B877 /* iOSBLEExample.app */,
+				B4BA9D6C2931665F00E838E9 /* ecjpake_test */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -125,6 +165,7 @@
 				B401AA3C29022A1200C4B877 /* ContentView.swift */,
 				B43F42F02903CD4E0027B989 /* SetupWiFi.swift */,
 				B43F42EE2903C99A0027B989 /* QRScanner.swift */,
+				B43F42F22903D8A60027B989 /* BLEObservable.swift */,
 			);
 			path = SwiftUI;
 			sourceTree = "<group>";
@@ -132,9 +173,11 @@
 		B43F42F5290484340027B989 /* ParticleBLECode */ = {
 			isa = PBXGroup;
 			children = (
+				B401AA4829022B7500C4B877 /* ParticleBLEInterface.swift */,
+				B4BA9D8C2933E86800E838E9 /* ParticleBLEInterfaceAbstract.swift */,
+				B4BA9D782933B47B00E838E9 /* ParticleBLEProtocol.swift */,
 				B43F42E429038CF70027B989 /* ECJPake.swift */,
-				B401AA4829022B7500C4B877 /* ParticleBLE.swift */,
-				B43F42F22903D8A60027B989 /* ParticleBLEObservable.swift */,
+				B4BA9D662931590400E838E9 /* HMACSha256.swift */,
 			);
 			path = ParticleBLECode;
 			sourceTree = "<group>";
@@ -157,6 +200,22 @@
 				B4B6089A290369CE00DBE6DF /* wifi.pb.swift */,
 			);
 			path = ProtoBufs;
+			sourceTree = "<group>";
+		};
+		B4BA9D6D2931665F00E838E9 /* mac_test_app */ = {
+			isa = PBXGroup;
+			children = (
+				B4BA9D8F293465BF00E838E9 /* ecjpake_test.entitlements */,
+				B4BA9D6E2931665F00E838E9 /* main.swift */,
+			);
+			path = mac_test_app;
+			sourceTree = "<group>";
+		};
+		B4BA9D73293166EB00E838E9 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -187,6 +246,28 @@
 			productReference = B401AA3729022A1200C4B877 /* iOSBLEExample.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B4BA9D6B2931665F00E838E9 /* ecjpake_test */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4BA9D702931665F00E838E9 /* Build configuration list for PBXNativeTarget "ecjpake_test" */;
+			buildPhases = (
+				B4BA9D682931665F00E838E9 /* Sources */,
+				B4BA9D692931665F00E838E9 /* Frameworks */,
+				B4BA9D6A2931665F00E838E9 /* CopyFiles */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ecjpake_test;
+			packageProductDependencies = (
+				B4BA9D74293166EB00E838E9 /* libmbedtls */,
+				B4BA9D882933DE7200E838E9 /* NIOCore */,
+				B4BA9D8A2933DE7800E838E9 /* SwiftProtobuf */,
+			);
+			productName = ecjpake_test;
+			productReference = B4BA9D6C2931665F00E838E9 /* ecjpake_test */;
+			productType = "com.apple.product-type.tool";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -194,11 +275,14 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1400;
+				LastSwiftUpdateCheck = 1410;
 				LastUpgradeCheck = 1400;
 				TargetAttributes = {
 					B401AA3629022A1200C4B877 = {
 						CreatedOnToolsVersion = 14.0.1;
+					};
+					B4BA9D6B2931665F00E838E9 = {
+						CreatedOnToolsVersion = 14.1;
 					};
 				};
 			};
@@ -222,6 +306,7 @@
 			projectRoot = "";
 			targets = (
 				B401AA3629022A1200C4B877 /* iOSBLEExample */,
+				B4BA9D6B2931665F00E838E9 /* ecjpake_test */,
 			);
 		};
 /* End PBXProject section */
@@ -243,13 +328,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B4BA9D8D2933E86800E838E9 /* ParticleBLEInterfaceAbstract.swift in Sources */,
 				B4B608A9290369CE00DBE6DF /* storage.pb.swift in Sources */,
 				B4B608A1290369CE00DBE6DF /* cellular.pb.swift in Sources */,
 				B4B608A3290369CE00DBE6DF /* mesh.pb.swift in Sources */,
 				B4B608A0290369CE00DBE6DF /* common.pb.swift in Sources */,
 				B4B608A6290369CE00DBE6DF /* extensions.pb.swift in Sources */,
+				B4BA9D792933B47B00E838E9 /* ParticleBLEProtocol.swift in Sources */,
 				B4B6089D290369CE00DBE6DF /* cloud.pb.swift in Sources */,
 				B4B608A5290369CE00DBE6DF /* wifi_new.pb.swift in Sources */,
+				B4BA9D672931590400E838E9 /* HMACSha256.swift in Sources */,
 				B4B608A4290369CE00DBE6DF /* control.pb.swift in Sources */,
 				B4B608A7290369CE00DBE6DF /* wifi.pb.swift in Sources */,
 				B43F42EF2903C99A0027B989 /* QRScanner.swift in Sources */,
@@ -257,12 +345,22 @@
 				B401AA3D29022A1200C4B877 /* ContentView.swift in Sources */,
 				B4B6089F290369CE00DBE6DF /* network.pb.swift in Sources */,
 				B43F42F12903CD4E0027B989 /* SetupWiFi.swift in Sources */,
-				B43F42F32903D8A60027B989 /* ParticleBLEObservable.swift in Sources */,
-				B401AA4929022B7500C4B877 /* ParticleBLE.swift in Sources */,
+				B43F42F32903D8A60027B989 /* BLEObservable.swift in Sources */,
+				B401AA4929022B7500C4B877 /* ParticleBLEInterface.swift in Sources */,
 				B4B608A8290369CE00DBE6DF /* internal.pb.swift in Sources */,
 				B4B608A2290369CE00DBE6DF /* logging.pb.swift in Sources */,
 				B43F42E529038CF70027B989 /* ECJPake.swift in Sources */,
 				B401AA3B29022A1200C4B877 /* iOSBLEExampleApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B4BA9D682931665F00E838E9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4BA9D762931680900E838E9 /* ECJPake.swift in Sources */,
+				B4BA9D772931680900E838E9 /* HMACSha256.swift in Sources */,
+				B4BA9D6F2931665F00E838E9 /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,6 +545,34 @@
 			};
 			name = Release;
 		};
+		B4BA9D712931665F00E838E9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ecjpake_test.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = TNJ67X9MQD;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.5;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		B4BA9D722931665F00E838E9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ecjpake_test.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = TNJ67X9MQD;
+				ENABLE_HARDENED_RUNTIME = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.5;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -464,6 +590,15 @@
 			buildConfigurations = (
 				B401AA4629022A1400C4B877 /* Debug */,
 				B401AA4729022A1400C4B877 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B4BA9D702931665F00E838E9 /* Build configuration list for PBXNativeTarget "ecjpake_test" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4BA9D712931665F00E838E9 /* Debug */,
+				B4BA9D722931665F00E838E9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -535,6 +670,20 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B4B608B1290377F000DBE6DF /* XCRemoteSwiftPackageReference "mbedTLS-iOS" */;
 			productName = mbedTLS;
+		};
+		B4BA9D74293166EB00E838E9 /* libmbedtls */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = libmbedtls;
+		};
+		B4BA9D882933DE7200E838E9 /* NIOCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B43F42E829039B260027B989 /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOCore;
+		};
+		B4BA9D8A2933DE7800E838E9 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B401AA4A29023FC500C4B877 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

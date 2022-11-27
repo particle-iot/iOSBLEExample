@@ -9,60 +9,16 @@ import Foundation
 import CoreBluetooth
 import NIOCore
 
-protocol ParticleBLEDelegate {
-    func statusUpdated()
-}
-
-class ParticleBLE: NSObject {
+class ParticleBLE: ParticleBLEInterfaceAbstract {
     
-    enum BLEState: String, Codable {
-        case idle
-        case waitingForUserInput
-        case lookingForDevice
-        case lookingForDeviceTimeout
-        case connectingToDevice
-        case connectingToDeviceTimeout
-        case connectedAndWaitingForVersion
-        case connectedAndRunning
-    }
-    var bleState: BLEState = .idle
+    ///
+    /// Variables
+    ///
 
     var timer = Timer()
     var timerRunning: Bool = false
     var timerRunTime: Int = 0
     var bleScanning: Bool = false
-    
-    var lastWifiAPsSeen: [Particle_Ctrl_Wifi_ScanNetworksReply.Network] = []
-    
-    var currentConnectedAP: Particle_Ctrl_Wifi_GetCurrentNetworkReply = Particle_Ctrl_Wifi_GetCurrentNetworkReply()
-    
-    //this is the header for the BLE protocol
-    let REQUEST_PACKET_OVERHEAD: Int = 8
-    
-    let ECHO_REQUEST_TYPE: UInt16 = 1
-    let SCAN_NETWORKS_TYPE: UInt16 = 506
-    let JOIN_KNOWN_NETWORK_TYPE: UInt16 = 500
-    let GET_CURRENT_NETWORK_TYPE: UInt16 = 505
-    
-    struct ReceivingData {
-        var reqID: UInt16
-        var dataLength: UInt16
-        var buf: ByteBuffer!
-    }
-    
-    var receivingData: ReceivingData? = nil
-    
-    enum ParticleBLEState {
-        case Inactive
-        case Active
-        case Passed
-        case Failed
-    }
-    
-    struct Message {
-        var reqID: UInt16
-        var payload: [UInt8]
-    }
 
     //The bluetooth bits
     var centralManager: CBCentralManager!
@@ -79,52 +35,44 @@ class ParticleBLE: NSObject {
     var txCharacteristic: CBCharacteristic?
     var versionCharacteristic: CBCharacteristic?
     
-    var reqIDToTypeDict: [UInt16: UInt16] = [:]
-    var nextReqID: UInt16 = 0
-    
     //device details
     var bleName: String = ""
-    var mobileSecret: String = ""
     
-    //delegate list
-    var delegates:[ParticleBLEDelegate] = []
+    var startupCompletionHandler: (() -> Void)? = nil
 
-    func startup() {
-        centralManager = CBCentralManager(delegate: self, queue: nil)
-    }
+    ///
+    /// Public funcs
+    ///
     
-    func setDeviceDetails(bleName: String, mobileSecret: String) {
+    //an explicit startup command is needed (vs an init) because this can prompt the user for permissions
+    override func startup(bleName: String, completionHandler: @escaping () -> Void) {
         self.bleName = bleName
-        self.mobileSecret = mobileSecret
+        centralManager = CBCentralManager(delegate: self, queue: nil)
+        
+        //store the completionHandler for when the BLE interface turns on.
+        startupCompletionHandler = completionHandler
+    }
+    
+    func startConnectionProcess() {
+        updateState(state: .lookingForDevice)
     }
 
-    func registerDelegate( delegate: ParticleBLEDelegate ) {
-        delegates.append( delegate )
-        delegate.statusUpdated()
-    }
-    
-    private func informDelegates() {
-        for d in delegates {
-            d.statusUpdated()
-        }
-    }
-    
-    func updateState( state: BLEState ) {
+    ///
+    /// Private functions
+    ///
+
+    private func updateState( state: State ) {
         
         print("updateState(\(state))")
         
         //gotta be a new state, right?
-        assert(self.bleState != state)
+        assert(self.state != state)
         
         var runTimer: Bool = false
         var resetTimeout: Bool = false
         var scanBLE: Bool = false
 
         switch state {
-            case .waitingForUserInput:
-                runTimer = false
-                scanBLE = false
-
             case .lookingForDevice:
                 resetTimeout = true
                 runTimer = true
@@ -140,17 +88,22 @@ class ParticleBLE: NSObject {
                 runTimer = true
                 scanBLE = true
             
-            case .connectedAndRunning:
+            case .connected:
                 resetTimeout = true
                 runTimer = false
                 scanBLE = false
             
-            case .connectedAndWaitingForVersion:
+            case .connectedButWaitingForVersion:
                 resetTimeout = true
                 runTimer = false
                 scanBLE = false
 
             case .idle:
+                resetTimeout = true
+                runTimer = false
+                scanBLE = false
+            
+            case .disconnected:
                 resetTimeout = true
                 runTimer = false
                 scanBLE = false
@@ -187,10 +140,10 @@ class ParticleBLE: NSObject {
         bleScanning = scanBLE
         
         //store the new state
-        self.bleState = state
+        self.state = state
         
         //inform the delegates!
-        informDelegates()
+        informDelegatesOfStatusUpdate(state: state)
     }
     
     @objc func updateTimer() {
@@ -198,7 +151,7 @@ class ParticleBLE: NSObject {
         
         print("updateTimer\(timerRunTime)")
 
-        switch self.bleState {
+        switch self.state {
             case .lookingForDevice:
                 if timerRunTime > 60 {
                     self.updateState(state: .lookingForDeviceTimeout)
@@ -216,7 +169,27 @@ class ParticleBLE: NSObject {
             break
         }
     }
-
+    
+    override func sendBuffer(buffer: [UInt8]) {
+        let maxPacketSize: Int? = peripheral?.maximumWriteValueLength(for: .withoutResponse)
+       
+        var bufferSize = buffer.count
+        var currentOffset = 0
+        var currentMaxLimit = min( maxPacketSize!, bufferSize )
+        
+        while bufferSize != 0 {
+            peripheral?.writeValue(Data(buffer[currentOffset...(currentMaxLimit-1)]), for: rxCharacteristic!, type: .withoutResponse)
+            
+            let dataJustSent = (currentMaxLimit - currentOffset)
+            bufferSize -= dataJustSent
+            currentOffset += dataJustSent
+            
+            if bufferSize != 0 {
+                let nextRound = (bufferSize > maxPacketSize! ? maxPacketSize! : bufferSize)
+                currentMaxLimit = currentOffset + nextRound
+            }
+        }
+    }
 }
 
 extension ParticleBLE: CBCentralManagerDelegate {
@@ -234,6 +207,10 @@ extension ParticleBLE: CBCentralManagerDelegate {
                 print("central.state is .poweredOff")
             case .poweredOn:
                 print("central.state is .poweredOn")
+                if startupCompletionHandler != nil {
+                    startupCompletionHandler!()
+                    startupCompletionHandler = nil
+                }
             @unknown default:
                 print("central.state is .unknown")
         }
@@ -275,15 +252,17 @@ extension ParticleBLE: CBCentralManagerDelegate {
                 do {
                     let (companyID, platformID, setupCode) = try getManufacturingData( advertisementData: advertisementData )
                     
-                    //check the companyID ?
+                    //check the companyID - you should change this on a per product implementation
+                    //these defaults are for Particle's tinker implementation
                     assert(companyID == 0x1234)
                     assert(platformID == 0x0020)
+                    print(setupCode)
                 }
                 catch {
                     
                 }
                 
-                if( self.bleState == .lookingForDevice ) {
+                if( self.state == .lookingForDevice ) {
                     self.peripheral = peripheral
         
                     self.centralManager.connect(self.peripheral!)
@@ -298,8 +277,12 @@ extension ParticleBLE: CBCentralManagerDelegate {
         peripheral.delegate = self
         peripheral.discoverServices(nil)
     }
+    
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        print("didDisconnectPeripheral(\(peripheral))")
+        updateState(state: .disconnected)
+    }
 }
-
 
 
 extension ParticleBLE: CBPeripheralDelegate {
@@ -335,8 +318,8 @@ extension ParticleBLE: CBPeripheralDelegate {
         if versionCharacteristic != nil {
             //read the version
             peripheral.readValue(for: versionCharacteristic!)
-            if bleState == .connectingToDevice {
-                self.updateState(state: .connectedAndWaitingForVersion)
+            if state == .connectingToDevice {
+                self.updateState(state: .connectedButWaitingForVersion)
             }
         }
         
@@ -358,62 +341,19 @@ extension ParticleBLE: CBPeripheralDelegate {
         if characteristic.uuid == versionUUID {
             print("Version Data: \(characteristic.value![0])")
             
-            //we should check the version above, but for now assume its 2
-            if bleState == .connectedAndWaitingForVersion {
-                self.updateState(state: .connectedAndRunning)
+            //we could check the version above, but for now assume its 2
+            if state == .connectedButWaitingForVersion {
+                self.updateState(state: .connected)
             }
         }
         else if characteristic.uuid == txUUID {
             //decode
             if let data = characteristic.value {
-                let (messageValid, receivedMsg) = decodePacket(buffer: Array(data))
-
-                if messageValid {
-                    //get request type
-                    let type = reqIDToTypeDict[receivedMsg!.reqID]
+                
+                if state == .connected {
                     
-                    if type == ECHO_REQUEST_TYPE {
-                        //echo
-                        let str = String(decoding: receivedMsg!.payload, as: UTF8.self)
-                        print("Received echo: \(str)")
-                        
-                    } else if type == SCAN_NETWORKS_TYPE {
-                        do {
-                            let scannedNetworks: Particle_Ctrl_Wifi_ScanNetworksReply = try Particle_Ctrl_Wifi_ScanNetworksReply(serializedData: Data(receivedMsg!.payload))
-                            
-                            //print out what we found
-                            for network in scannedNetworks.networks {
-                                print("\(network.ssid) \(network.rssi)")
-                            }
-                            
-                            self.lastWifiAPsSeen = scannedNetworks.networks
-                        }
-                        catch {
-                            
-                        }
-                        
-                        informDelegates()
-                    } else if type == JOIN_KNOWN_NETWORK_TYPE {
-                        do {
-                            let joinNetworkReply: Particle_Ctrl_Wifi_JoinNewNetworkReply = try Particle_Ctrl_Wifi_JoinNewNetworkReply(serializedData: Data(receivedMsg!.payload))
-                        }
-                        catch {
-                            
-                        }
-
-                        informDelegates()
-                    } else if type == GET_CURRENT_NETWORK_TYPE {
-                        do {
-                            let currentNetworkReply: Particle_Ctrl_Wifi_GetCurrentNetworkReply = try Particle_Ctrl_Wifi_GetCurrentNetworkReply(serializedData: Data(receivedMsg!.payload))
-                            
-                            currentConnectedAP = currentNetworkReply
-                        }
-                        catch {
-                            
-                        }
-
-                        informDelegates()
-                    }
+                    informDelegatesOfDataAvailable(data: Array(data))
+                    
                 }
             }
         }
@@ -421,113 +361,6 @@ extension ParticleBLE: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
         print("didWriteValueFor(\(characteristic)")
-    }
-    
-    func requestWiFiAPs() {
-        sendPacket(type: SCAN_NETWORKS_TYPE, data: [] )
-    }
-    
-    func requestJoinWiFiNetwork(network: Particle_Ctrl_Wifi_ScanNetworksReply.Network, password: String) {
-        var joinNetworkRequest = Particle_Ctrl_Wifi_JoinNewNetworkRequest()
-        
-        joinNetworkRequest.ssid = network.ssid
-        joinNetworkRequest.security = network.security
-        joinNetworkRequest.credentials.password = password
-        joinNetworkRequest.credentials.type = .password
-        joinNetworkRequest.bssid = network.bssid
-
-        do {
-            try sendPacket(type: JOIN_KNOWN_NETWORK_TYPE, data: Array(joinNetworkRequest.serializedData()) )
-        }
-        catch {
-            
-        }
-    }
-    
-    func requestCurrentNetwork() {
-        sendPacket(type: GET_CURRENT_NETWORK_TYPE, data: [] )
-    }
-    
-    func requestEcho() {
-        //send a test packet
-        let string = "hello"
-        let dataToSend: [UInt8] = Array(string.utf8)
-        
-        sendPacket(type: ECHO_REQUEST_TYPE, data: dataToSend )
-    }
-    
-    func sendPacket(type: UInt16, data: [UInt8]) {
-        
-        let reqID: UInt16 = nextReqID
-        nextReqID += 1
-        reqIDToTypeDict[reqID] = type
-
-        print("Send packet: \(reqID), \(type), \(data.count)")
-        
-        let reserved: UInt16 = 0
-        
-        let allocator = ByteBufferAllocator()
-        var buf: ByteBuffer! = nil
-        
-        buf = allocator.buffer(capacity: data.count + REQUEST_PACKET_OVERHEAD)
-        buf.writeInteger(UInt16(data.count), endianness: .little)
-        buf.writeInteger(reqID, endianness: .little)
-        buf.writeInteger(type, endianness: .little)
-        buf.writeInteger(reserved, endianness: .little)
-        buf.writeBytes(data)
-        
-        peripheral?.writeValue(Data(buf.getBytes(at: 0, length: buf.readableBytes) ?? []), for: rxCharacteristic!, type: .withoutResponse)
-    }
-    
-    func decodePacket(buffer: [UInt8]) -> ( messageOK: Bool, receivedMsg: Message? ) {
-        print("decodePacket \(buffer.count)")
-
-        let startPacket: Bool = (receivingData == nil)
-        
-        var workingBuffer: [UInt8] = buffer
-        
-        if startPacket {
-            //get the header etc...
-            let allocator = ByteBufferAllocator()
-            var buf: ByteBuffer! = nil
-            buf = allocator.buffer(capacity: buffer.count)
-            buf.writeBytes(buffer)
-            
-            let dataLength: UInt16 = buf.readInteger(endianness: .little)!
-            let reqID: UInt16 = buf.readInteger(endianness: .little)!
-            let _: UInt16 = buf.readInteger(endianness: .little)!
-            let _: UInt16 = buf.readInteger(endianness: .little)!
-            
-            //free the buf above?
-            
-            //remove the first 8 bytes from the buffer
-            workingBuffer = Array(workingBuffer[REQUEST_PACKET_OVERHEAD...])
-            
-            //create the receiving buffer
-            var recBuf: ByteBuffer! = nil
-            recBuf = allocator.buffer(capacity: Int(dataLength))
-
-            receivingData = ReceivingData(reqID: reqID, dataLength: dataLength, buf: recBuf)
-        }
-
-        //write the received data in to the buffer
-        receivingData!.buf.writeBytes(workingBuffer)
-        
-        //message?
-        var returnMessage: Message? = nil
-        
-        //anything left to receive?
-        let bytesLeftToReceive = receivingData!.dataLength - UInt16(receivingData!.buf.readableBytes)
-        
-        print("Receive packet: \(bytesLeftToReceive)")
-        
-        //reset the buffer if nothing left to received
-        if bytesLeftToReceive == 0 {
-            returnMessage = Message(reqID: receivingData!.reqID, payload: receivingData!.buf.getBytes(at: 0, length: receivingData!.buf.readableBytes) ?? [])
-            receivingData = nil
-        }
-
-        return ( bytesLeftToReceive == 0, returnMessage )
     }
 }
 

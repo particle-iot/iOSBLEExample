@@ -12,21 +12,29 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     
     //this is the state of the local UI panel that is selecting the wifi AP from the users perspective
     enum WiFiConnectivityState: Codable {
+        case SearchingForDevice
         case Connecting
         case ScanningForAPs
         case EnteringCredentials
         case JoiningNetwork
+        case CheckingJoinedNetwork
         case Finished
         case Error
         case ErrorNoConnection
+        case ErrorUnableToConnect
+        case ErrorFailedToJoinNetwork
     }
     
-    @State var wifiOnboardingState: WiFiConnectivityState = .Connecting
+    @State var wifiOnboardingState: WiFiConnectivityState = .SearchingForDevice
     
     @State var bleName: String
     @State var mobileSecret: String
     
     @State var password: String = ""
+    
+    //this field below is quite terrible, but its used so the UI can show the network name in the same
+    //manner as the password box, purely for asthetics.. there is probably a better way, but the bindings
+    @State var dummyField: String = ""
     
     @State var selectedNetwork: Particle_Ctrl_Wifi_ScanNetworksReply.Network? = nil
     
@@ -34,25 +42,26 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     @StateObject var particleBLEObservable = ParticleBLEObservable()
     
     //this is used to refresh the wifi networks list. This timer always runs and we use the counter to measure it
+    //the design pattern of "running a timer all the time and observing it / resetting it" isn't great, but swiftUI has
+    //note matured enough to give a better version of this (as of writing)
     @State var wifiAPRefreshTimer = Timer.publish(every: 1,  on: .main, in: .common).autoconnect()
     @State var wifiAPRefreshCount = 0
-    
+
     //the particleBLEObservable delegate
     func stateUpdated() {
         if particleBLEObservable.connected {
             if( wifiOnboardingState == .Connecting ) {
                 wifiOnboardingState = .ScanningForAPs
             }
-            
-            if( wifiOnboardingState == .JoiningNetwork ) {
-                if selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid {
-                    wifiOnboardingState = .Finished
-                }
+        }
+        else if particleBLEObservable.deviceFound {
+            if( wifiOnboardingState == .SearchingForDevice ) {
+                wifiOnboardingState = .Connecting
             }
         }
         else {
             //go to an error state if we disconnect before we've finished
-            if( wifiOnboardingState != .Connecting ) {
+            if( (wifiOnboardingState != .Connecting) && (wifiOnboardingState != .SearchingForDevice) ) {
                 wifiOnboardingState = .Error
             }
         }
@@ -60,10 +69,13 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     
     var body: some View {
       VStack() {
-          if wifiOnboardingState == .Connecting {
+          //the connecting and searching UI is the same in this application
+          //the different is just that we show different error messages
+          if wifiOnboardingState == .SearchingForDevice || wifiOnboardingState == .Connecting {
               VStack() {
                   //just show the state as it connects
-                  Text(particleBLEObservable.bleStateAsTextString)
+                  Text("Interface: " + particleBLEObservable.bleInterfaceStateAsTextString)
+                  Text("Protocol: " + particleBLEObservable.bleProtocolStateAsTextString)
                   ProgressView()
                       .padding()
                       .shadow(color: Color(red: 0, green: 0, blue: 0.6),
@@ -80,8 +92,13 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                   wifiAPRefreshCount += 1
                   
                   if wifiAPRefreshCount > 30 {
-                      //time out
-                      wifiOnboardingState = .ErrorNoConnection
+                      //time out caused by what?
+                      if wifiOnboardingState == .SearchingForDevice {
+                          wifiOnboardingState = .ErrorNoConnection
+                      }
+                      else {
+                          wifiOnboardingState = .ErrorUnableToConnect
+                      }
                   }
               }
           }
@@ -111,7 +128,8 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                       wifiAPRefreshCount += 1
                       
                       if wifiAPRefreshCount > 10 {
-                          //re-request the wifi list
+                          //re-request the wifi list infinitum (but only every 10 seconds,
+                          //this being an arbitary number I invented as 'reasonable' but without any evidence for / against
                           particleBLEObservable.requestWiFiAPs()
                           
                           //reset the timer again
@@ -127,6 +145,14 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
           else if wifiOnboardingState == .EnteringCredentials {
               VStack() {
                   HStack() {
+                      Text("Wi-Fi AP")
+                      TextField(selectedNetwork!.ssid, text: $dummyField)
+                      .disabled(true)
+                      .padding()
+                      .font(Font.custom("HelveticaNeue", size: 20, relativeTo: .body))
+                      .foregroundColor(Color.red)
+                  }
+                  HStack() {
                       Text("Password")
                       TextField(
                         "Password",
@@ -137,8 +163,17 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                       .foregroundColor(Color.red)
                   }
                   Button {
-                      particleBLEObservable.connectWithPassword(network: selectedNetwork!, password: password)
+                      //switch to the checking state immediatly - the closure below will kick it out of this state when it completes
                       wifiOnboardingState = .JoiningNetwork
+                      
+                      particleBLEObservable.connectWithPassword(network: selectedNetwork!, password: password) { error in
+                          if error != nil {
+                              wifiOnboardingState = .ErrorFailedToJoinNetwork
+                          }
+                          else {
+                              wifiOnboardingState = .CheckingJoinedNetwork
+                          }
+                      }
                   }
                   label: {
                       Text("Submit")
@@ -154,10 +189,29 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                       .shadow(color: Color(red: 0, green: 0, blue: 0.6),
                                           radius: 4.0, x: 1.0, y: 2.0)
               }
+          }
+          else if wifiOnboardingState == .CheckingJoinedNetwork {
+              VStack() {
+                  Text("Checking Joined Network")
+                  Text(particleBLEObservable.currentConnectedNetwork.ssid)
+                  ProgressView()
+                      .padding()
+                      .shadow(color: Color(red: 0, green: 0, blue: 0.6),
+                                          radius: 4.0, x: 1.0, y: 2.0)
+              }
               .onAppear() {
                   //request the wifi list
-                  particleBLEObservable.requestCurrentlyConnectedNetwork()
-                  
+                  particleBLEObservable.requestCurrentlyConnectedNetwork() { error in
+                      if error == nil {
+                          if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
+                              wifiOnboardingState = .Finished
+                          }
+                          else {
+                              wifiOnboardingState = .ErrorFailedToJoinNetwork
+                          }
+                      }
+                  }
+
                   //reset the timer
                   wifiAPRefreshCount = 0
               }
@@ -166,10 +220,26 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
 
                   if wifiAPRefreshCount > 5 {
                       //re-request the wifi current connection
-                      particleBLEObservable.requestCurrentlyConnectedNetwork()
+                      particleBLEObservable.requestCurrentlyConnectedNetwork() { error in
+                          if error == nil {
+                              if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
+                                  wifiOnboardingState = .Finished
+                              }
+                              else {
+                                  wifiOnboardingState = .ErrorFailedToJoinNetwork
+                              }
+                          }
+                      }
                       
                       //reset the timer again
                       wifiAPRefreshCount = 0
+                  }
+                  
+                  //did we connect?!
+                  //Note, here you can do additional network rechability tests etc... to validate that a connection is made
+                  //You can also check if the device is now talking to the Particle Cloud
+                  if (particleBLEObservable.currentConnectedNetwork != nil) && (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
+                      wifiOnboardingState = .Finished
                   }
               }
           }
@@ -181,6 +251,12 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
           }
           else if wifiOnboardingState == .ErrorNoConnection {
               Text("Device was not found!")
+          }
+          else if wifiOnboardingState == .ErrorUnableToConnect {
+              Text("Unable to connect to the device!")
+          }
+          else if wifiOnboardingState == .ErrorFailedToJoinNetwork {
+              Text("Error joining network!")
           }
       }
     }

@@ -7,10 +7,6 @@
 
 import SwiftUI
 
-//Todo:
-// create a state class and add in ParticleBLEDelegate to update the UI
-// create an QR scanning flow
-
 struct ContentView: View {
     @State private var isShowingScanner = false
     
@@ -20,6 +16,7 @@ struct ContentView: View {
     var body: some View {
         NavigationView {
             VStack() {
+                Image("particle-logo-stacked").padding()
                 HStack() {
                     Text("BLE Name")
                     TextField(
