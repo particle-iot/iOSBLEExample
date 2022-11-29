@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+//This is an entry point for the setup flow screen.
+//The bleName is taken from the firmware BLE application and should be customized per product
+//The mobile secret is taken from the QR on the front of the module. This secret can be overridden to something
+//else in the firmware if needed.
 struct ContentView: View {
     @State private var isShowingScanner = false
     

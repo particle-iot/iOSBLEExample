@@ -40,6 +40,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         case failedToJoinNetwork
         case requestAlreadyInProgess
         case badMessageFromDevice
+        case failedToRetrieveNetwork
     }
     
     //this is the header for the BLE protocol
@@ -55,8 +56,9 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
     let JOIN_KNOWN_NETWORK_TYPE: UInt16 = 500
     let GET_CURRENT_NETWORK_TYPE: UInt16 = 505
     
-    struct Message {
+    struct ReceivedMessage {
         var reqID: UInt16
+        var result: UInt32
         var payload: [UInt8]
     }
     
@@ -312,11 +314,11 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         //echo
                         let str = String(decoding: decodedMessage.payload, as: UTF8.self)
                         print("Received echo: \(str)")
-                        
+
                         assert( requestEchoCompletionHandler != nil )
                         requestEchoCompletionHandler!(str, nil)
                         requestEchoCompletionHandler = nil
-                        
+
                     } else if type == SCAN_NETWORKS_TYPE {
                         
                         var thisError: Error?
@@ -324,11 +326,6 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         
                         do {
                             scannedNetworks = try Particle_Ctrl_Wifi_ScanNetworksReply(serializedData: Data(decodedMessage.payload))
-                            
-                            //print out what we found
-                            for network in scannedNetworks!.networks {
-                                print("\(network.ssid) \(network.rssi)")
-                            }
                         }
                         catch {
                             thisError = ParticleBLEProtocolError.badMessageFromDevice
@@ -345,7 +342,10 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         do {
                             let _: Particle_Ctrl_Wifi_JoinNewNetworkReply = try Particle_Ctrl_Wifi_JoinNewNetworkReply(serializedData: Data(decodedMessage.payload))
                             
-                            //the return packet doesn't save it if connects, so we just have to check later on
+                            //if the result is not 0, we failed to join the network
+                            if decodedMessage.result != 0 {
+                                joinNetworkError = ParticleBLEProtocolError.failedToJoinNetwork
+                            }
                         }
                         catch {
                             joinNetworkError = ParticleBLEProtocolError.failedToJoinNetwork
@@ -356,16 +356,20 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         requestJoinNetworkCompletionHandler = nil
                         
                     } else if type == GET_CURRENT_NETWORK_TYPE {
+                        
+                        var currentNetworkReply: Particle_Ctrl_Wifi_GetCurrentNetworkReply? = nil
+                        var getCurrentNetworkError: Error? = nil
+                        
                         do {
-                            let currentNetworkReply: Particle_Ctrl_Wifi_GetCurrentNetworkReply = try Particle_Ctrl_Wifi_GetCurrentNetworkReply(serializedData: Data(decodedMessage.payload))
-                            
-                            assert( currentConnectedAPCompletionHandler != nil )
-                            currentConnectedAPCompletionHandler!(currentNetworkReply, nil)
-                            currentConnectedAPCompletionHandler = nil
+                            currentNetworkReply = try Particle_Ctrl_Wifi_GetCurrentNetworkReply(serializedData: Data(decodedMessage.payload))
                         }
                         catch {
-                            
+                            getCurrentNetworkError = ParticleBLEProtocolError.failedToRetrieveNetwork
                         }
+
+                        assert( currentConnectedAPCompletionHandler != nil )
+                        currentConnectedAPCompletionHandler!(currentNetworkReply, getCurrentNetworkError)
+                        currentConnectedAPCompletionHandler = nil
                     }
                     
                     //remove the request type!
@@ -403,7 +407,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         }
     }
     
-    func decodePacket(buffer: [UInt8]) -> Message {
+    func decodePacket(buffer: [UInt8]) -> ReceivedMessage {
 
         print("decodePacket \(buffer.count)")
         
@@ -432,10 +436,10 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         //read the reply/request header!
         let reqID: UInt16 = buf.readInteger(endianness: .little)!
         let result: UInt32 = buf.readInteger(endianness: .little)!
+        
+        //TODO - return the result to the caller
 
-        print(result)
-
-        return Message(reqID: reqID, payload: buf.getBytes(at: (MESSAGE_HEADER_SIZE+REPLY_HEADER_SIZE), length: Int(messageLength)) ?? [])
+        return ReceivedMessage(reqID: reqID, result: result, payload: buf.getBytes(at: (MESSAGE_HEADER_SIZE+REPLY_HEADER_SIZE), length: Int(messageLength)) ?? [])
     }
     
     func sendSecurityPacket(data: [UInt8]) {

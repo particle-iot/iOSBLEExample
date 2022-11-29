@@ -136,15 +136,6 @@ public class ecJPAKE {
             delegate!.handshakeCompleted()
         }
     }
-    
-    func dumpCurrentHash(name: String) {
-        let currentPacketHash = Sha256()
-        currentPacketHash.start() //unclear if this is needed!
-        currentPacketHash.copyFrom(src: hash )
-        let interimPacketHash = currentPacketHash.finish()
-        print("dumpCurrentHash: " + name)
-        print(interimPacketHash)
-    }
 
     deinit {
         jpakeContextAlloc!.deallocate()
@@ -189,7 +180,6 @@ public class ecJPAKE {
                     
                     //keep my hash up to date
                     hash.update(data: out)
-                    dumpCurrentHash(name: "write confirm")
 
                     state = .read_confirm
                 }
@@ -255,7 +245,6 @@ public class ecJPAKE {
                 writtenBytes.deallocate()
                 
                 hash.update(data: out)
-                dumpCurrentHash(name: "write round")
             }
             
             return out
@@ -283,8 +272,6 @@ public class ecJPAKE {
                     currentPacketHash.copyFrom(src: hash )
                     let interimPacketHash = currentPacketHash.finish()
                     
-                    dumpCurrentHash(name: "read confirm PRE")
-                    
                     //create the hmac confirmation message
                     let hmac = HMACSha256()
                     hmac.start(key: confirmationKey)
@@ -297,13 +284,10 @@ public class ecJPAKE {
                     assert( packet == confirmationPacket )
                     
                     hash.update(data: packet)
-                    dumpCurrentHash(name: "read confirm")
                     
                     state = .write_confirm
                 }
                 else {
-                    dumpCurrentHash(name: "read confirm")
-                    
                     let currentPacketHash = Sha256()
                     currentPacketHash.copyFrom(src: hash )
                     let interimPacketHash = currentPacketHash.finish()
@@ -390,12 +374,6 @@ public class ecJPAKE {
         confirmationKeyHash.update(data: sharedSecret)
         confirmationKeyHash.update(data: Array<UInt8>("JPAKE_KC".utf8))
         let confirmationKey = confirmationKeyHash.finish()
-        
-        let sharedSecretHex = sharedSecret.map { String(format: "%02X", $0) }
-        print(sharedSecretHex.joined(separator: ":"))
-        
-        let confirmationKeyHex = confirmationKey.map { String(format: "%02X", $0) }
-        print(confirmationKeyHex.joined(separator: ":"))
         
         return (sharedSecret, confirmationKey)
     }

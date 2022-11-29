@@ -43,7 +43,7 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     
     //this is used to refresh the wifi networks list. This timer always runs and we use the counter to measure it
     //the design pattern of "running a timer all the time and observing it / resetting it" isn't great, but swiftUI has
-    //note matured enough to give a better version of this (as of writing)
+    //not matured enough to give a better version of this (as of writing)
     @State var wifiAPRefreshTimer = Timer.publish(every: 1,  on: .main, in: .common).autoconnect()
     @State var wifiAPRefreshCount = 0
 
@@ -102,6 +102,9 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                   }
               }
           }
+          //the scanning for wifi access points UI page is updated as new access points become available
+          //each successful scan MAY add in more networks to the list. the BLE Observer keeps the list up to date
+          //by merging in new networks as they are found
           else if wifiOnboardingState == .ScanningForAPs {
               VStack() {
                   Text("Select Wi-Fi Network")
@@ -142,6 +145,9 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                                           radius: 4.0, x: 1.0, y: 2.0)
               }
           }
+          //This screen always asked for the password. Some networks don't need a password, but
+          //that UI flow hasn't been implemented right now (its pretty trivial to do so, as the wifi AP list
+          //has info on what security each network needs)
           else if wifiOnboardingState == .EnteringCredentials {
               VStack() {
                   HStack() {
@@ -221,6 +227,7 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                   if wifiAPRefreshCount > 5 {
                       //re-request the wifi current connection
                       particleBLEObservable.requestCurrentlyConnectedNetwork() { error in
+                          //its possible this can error IF an existing call was still in progress
                           if error == nil {
                               if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
                                   wifiOnboardingState = .Finished

@@ -61,8 +61,6 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
     func requestWiFiAPs() {
         ParticleBLEExampleGlobals.particleBLEProtocolInstance.requestWiFiAPs() { newWifiAPs, error in
             if error == nil {
-                print(newWifiAPs!)
-
                 //first, update any networks that have a name that is not available. This solves the problem where a wifi network
                 //can be seen periodically, but its full details are not available from a single scan
                 for network in newWifiAPs! {
@@ -113,7 +111,6 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
             if error != nil {
                 print("requestCurrentlyConnectedNetwork error: " + error!.localizedDescription)
             } else {
-                print(currentConnectedAP!)
                 self.currentConnectedNetwork = currentConnectedAP!
             }
             

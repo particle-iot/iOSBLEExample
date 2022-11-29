@@ -227,13 +227,13 @@ extension ParticleBLE: CBCentralManagerDelegate {
             buf.writeBytes(Array(manufacturerData))
             
             let companyID: UInt16 = buf.readInteger(endianness: .little)!
-            print("companyID", String(format: "%04X", companyID))
+            //print("companyID", String(format: "%04X", companyID))
             
             let platformID: UInt16 = buf.readInteger(endianness: .little)!
-            print("platformID", String(format: "%04X", platformID))
+            //print("platformID", String(format: "%04X", platformID))
             
             let setupCode: String = buf.readString(length: 6)!
-            print("setupCode: \(setupCode)")
+            //print("setupCode: \(setupCode)")
             
             return (companyID, platformID, setupCode )
         }
@@ -256,7 +256,7 @@ extension ParticleBLE: CBCentralManagerDelegate {
                     //these defaults are for Particle's tinker implementation
                     assert(companyID == 0x1234)
                     assert(platformID == 0x0020)
-                    print(setupCode)
+                    //print(setupCode)
                 }
                 catch {
                     
