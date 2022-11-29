@@ -470,7 +470,7 @@ public class ecJPAKE {
     }
     
     func decryptData(payload: [UInt8], additionalData: [UInt8], aesTag: [UInt8]) -> [UInt8] {
-        let nonce = genReplyNonce()
+        let nonce = (role == .server) ? genRequestNonce() : genReplyNonce()
         
         let payloadPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: payload.count)
         payloadPointer.initialize(from: payload, count: payload.count)
