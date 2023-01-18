@@ -14,6 +14,7 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     enum WiFiConnectivityState: Codable {
         case SearchingForDevice
         case Connecting
+        case DeletingExistingWiFiConnections
         case ScanningForAPs
         case EnteringCredentials
         case JoiningNetwork
@@ -23,12 +24,14 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
         case ErrorNoConnection
         case ErrorUnableToConnect
         case ErrorFailedToJoinNetwork
+        case ErrorFailedToClearKnownNetworks
     }
     
     @State var wifiOnboardingState: WiFiConnectivityState = .SearchingForDevice
     
     @State var bleName: String
     @State var mobileSecret: String
+    @State var onConnectionDeleteAllWiFiCredentials: Bool
     
     @State var password: String = ""
     
@@ -51,7 +54,11 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
     func stateUpdated() {
         if particleBLEObservable.connected {
             if( wifiOnboardingState == .Connecting ) {
-                wifiOnboardingState = .ScanningForAPs
+                if onConnectionDeleteAllWiFiCredentials {
+                    wifiOnboardingState = .DeletingExistingWiFiConnections
+                } else {
+                    wifiOnboardingState = .ScanningForAPs
+                }
             }
         }
         else if particleBLEObservable.deviceFound {
@@ -102,6 +109,22 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                   }
               }
           }
+          else if wifiOnboardingState == .DeletingExistingWiFiConnections {
+              VStack() {
+                  Text("Deleting existing Wi-Fi Credentials")
+                  .onAppear() {
+                      //clear all wifi networks
+                      particleBLEObservable.deleteExistingWiFiAPs() { error in
+                          if error != nil {
+                              wifiOnboardingState = .ErrorFailedToClearKnownNetworks
+                          }
+                          else {
+                              wifiOnboardingState = .ScanningForAPs
+                          }
+                      }
+                  }
+              }
+          }
           //the scanning for wifi access points UI page is updated as new access points become available
           //each successful scan MAY add in more networks to the list. the BLE Observer keeps the list up to date
           //by merging in new networks as they are found
@@ -116,8 +139,23 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                       .onTapGesture {
                           selectedNetwork = ap
                           
-                          //join the selected network
-                          wifiOnboardingState = .EnteringCredentials
+                          //get the credentials (if the network is not open)
+                          if ap.security == .noSecurity {
+                              wifiOnboardingState = .JoiningNetwork
+
+                              //connect using no password
+                              particleBLEObservable.connectWithNoPassword(network: selectedNetwork!) { error in
+                                  if error != nil {
+                                      wifiOnboardingState = .ErrorFailedToJoinNetwork
+                                  }
+                                  else {
+                                      wifiOnboardingState = .CheckingJoinedNetwork
+                                  }
+                              }
+                          }
+                          else {
+                              wifiOnboardingState = .EnteringCredentials
+                          }
                       }
                   }
                   .onAppear() {
@@ -264,6 +302,9 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
           }
           else if wifiOnboardingState == .ErrorFailedToJoinNetwork {
               Text("Error joining network!")
+          }
+          else if wifiOnboardingState == .ErrorFailedToClearKnownNetworks {
+              Text("Error deleting known networks!")
           }
       }
     }

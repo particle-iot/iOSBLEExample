@@ -17,6 +17,8 @@ struct ContentView: View {
     @AppStorage("bleName") private var bleName: String = "aabbcc"
     @AppStorage("mobileSecret") private var mobileSecret: String = ""
     
+    @State private var onConnectionDeleteAllWiFiCredentials: Bool = false
+    
     var body: some View {
         NavigationView {
             VStack() {
@@ -47,7 +49,9 @@ struct ContentView: View {
                     .padding()
                 }
                 
-                NavigationLink(destination: SetupWiFi(bleName: bleName, mobileSecret: mobileSecret)) {
+                Toggle("On connection, delete all current Wi-Fi credentials", isOn: $onConnectionDeleteAllWiFiCredentials)
+                
+                NavigationLink(destination: SetupWiFi(bleName: bleName, mobileSecret: mobileSecret, onConnectionDeleteAllWiFiCredentials: onConnectionDeleteAllWiFiCredentials)) {
                     Text("Setup Wi-Fi")
                 }
                 .padding()

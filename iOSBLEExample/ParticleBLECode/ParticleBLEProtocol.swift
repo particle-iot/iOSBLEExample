@@ -41,6 +41,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         case requestAlreadyInProgess
         case badMessageFromDevice
         case failedToRetrieveNetwork
+        case failedToClearKnownNetworks
     }
     
     //this is the header for the BLE protocol
@@ -52,9 +53,10 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
     let SECURITY_PACKET_OVERHEAD: Int = 8
     
     let ECHO_REQUEST_TYPE: UInt16 = 1
-    let SCAN_NETWORKS_TYPE: UInt16 = 506
     let JOIN_KNOWN_NETWORK_TYPE: UInt16 = 500
+    let CLEAR_KNOWN_NETWORKS_TYPE: UInt16 = 504
     let GET_CURRENT_NETWORK_TYPE: UInt16 = 505
+    let SCAN_NETWORKS_TYPE: UInt16 = 506
     
     struct ReceivedMessage {
         var reqID: UInt16
@@ -86,6 +88,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
     var wifiAPCompletionHandler: ((_ wifiAPs: [Particle_Ctrl_Wifi_ScanNetworksReply.Network]?, _ error: Error?) -> Void)? = nil
     var currentConnectedAPCompletionHandler: ((_ currentConnectedAP: Particle_Ctrl_Wifi_GetCurrentNetworkReply?, _ error: Error?) -> Void)? = nil
     var requestJoinNetworkCompletionHandler: ((_ error: Error?) -> Void)? = nil
+    var clearKnownNetworksCompletionHandler: ((_ error: Error?) -> Void)? = nil
     var requestEchoCompletionHandler: ((_ echoResponse: String?, _ error: Error?) -> Void)? = nil
     
     var statusDelegates:[ParticleBLEProtocolStatusDelegate] = []
@@ -137,14 +140,20 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         }
     }
 
-    func requestJoinWiFiNetwork(network: Particle_Ctrl_Wifi_ScanNetworksReply.Network, password: String, completionHandler: @escaping (_ error: Error?) -> Void) {
+    func requestJoinWiFiNetwork(network: Particle_Ctrl_Wifi_ScanNetworksReply.Network, password: String?, completionHandler: @escaping (_ error: Error?) -> Void) {
         
         var joinNetworkRequest = Particle_Ctrl_Wifi_JoinNewNetworkRequest()
         
         joinNetworkRequest.ssid = network.ssid
         joinNetworkRequest.security = network.security
-        joinNetworkRequest.credentials.password = password
-        joinNetworkRequest.credentials.type = .password
+
+        if nil != password {
+            joinNetworkRequest.credentials.password = password!
+            joinNetworkRequest.credentials.type = .password
+        }
+        else {
+            joinNetworkRequest.credentials.type = .noCredentials
+        }
         joinNetworkRequest.bssid = network.bssid
         
         //only 1 allowed at once
@@ -160,6 +169,18 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
             }
         }
         else {
+            completionHandler(ParticleBLEProtocolError.requestAlreadyInProgess )
+        }
+    }
+    
+    func clearKnownNetworks( completionHandler: @escaping (_ error: Error?) -> Void) {
+        //only 1 allowed at once
+        if( self.clearKnownNetworksCompletionHandler == nil ) {
+            //store for async callback
+            self.clearKnownNetworksCompletionHandler = completionHandler
+            
+            sendPacket(type: CLEAR_KNOWN_NETWORKS_TYPE, data: [] )
+        } else {
             completionHandler(ParticleBLEProtocolError.requestAlreadyInProgess )
         }
     }
@@ -371,6 +392,25 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         currentConnectedAPCompletionHandler!(currentNetworkReply, getCurrentNetworkError)
                         currentConnectedAPCompletionHandler = nil
                     }
+                    else if type == CLEAR_KNOWN_NETWORKS_TYPE {
+                        var clearKnownNetworksError: Error? = nil
+                        
+                        do {
+                            let _: Particle_Ctrl_Wifi_ClearKnownNetworksReply = try Particle_Ctrl_Wifi_ClearKnownNetworksReply(serializedData: Data(decodedMessage.payload))
+                            
+                            //if the result is not 0, we failed to join the network
+                            if decodedMessage.result != 0 {
+                                clearKnownNetworksError = ParticleBLEProtocolError.failedToClearKnownNetworks
+                            }
+                        }
+                        catch {
+                            clearKnownNetworksError = ParticleBLEProtocolError.failedToClearKnownNetworks
+                        }
+                        
+                        assert( clearKnownNetworksCompletionHandler != nil )
+                        clearKnownNetworksCompletionHandler!(clearKnownNetworksError)
+                        clearKnownNetworksCompletionHandler = nil
+                    }
                     
                     //remove the request type!
                     reqIDToTypeDict.removeValue(forKey: decodedMessage.reqID)
@@ -504,32 +544,3 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         bleInterface.sendBuffer(buffer: txBuf.getBytes(at: 0, length: txBuf.readableBytes) ?? [])
     }
 }
-
-
-//
-//if SUPPORT_SECURITY {
-//    var secureBuf: ByteBuffer! = nil
-//    secureBuf = allocator.buffer(capacity: bufRequestHeader.readableBytes + MESSAGE_HEADER_PACKET_SIZE + SECURITY_PACKET_OVERHEAD)
-//
-//    //encrypt the packet
-//    let messageHeader = bufMessagerHeader.getBytes(at: 0, length: bufMessagerHeader.readableBytes) ?? []
-//    var (dataToEnc, aesTag) = ecjpake.encryptData(payload: bufRequestHeader.getBytes(at: 0, length: bufRequestHeader.readableBytes) ?? [], additionalData: messageHeader)
-//
-//    //write the new message
-//    secureBuf.writeBytes(messageHeader)
-//    secureBuf.writeBytes(dataToEnc)
-//    secureBuf.writeBytes(aesTag)
-//
-//    sendBuffer(buffer: secureBuf.getBytes(at: 0, length: secureBuf.readableBytes) ?? [])
-//}
-//else {
-//    var insecureBuffer: ByteBuffer! = nil
-//    insecureBuffer = allocator.buffer(capacity: bufRequestHeader.readableBytes + MESSAGE_HEADER_PACKET_SIZE)
-//
-//    insecureBuffer.writeInteger(UInt16(data.count))
-//    insecureBuffer.writeBytes( bufRequestHeader.getBytes(at: 0, length: bufRequestHeader.readableBytes) ?? [] )
-//
-//    sendBuffer(buffer: insecureBuffer.getBytes(at: 0, length: insecureBuffer.readableBytes) ?? [])
-//}
-
-

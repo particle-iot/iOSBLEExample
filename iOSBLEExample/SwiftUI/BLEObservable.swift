@@ -57,7 +57,18 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
     
     //protocol wrappers
     //these are used so it can update this observable that is used by SwiftUI to redraw the screen when it updates
-
+    func deleteExistingWiFiAPs(completionHandler: @escaping (_ error: Error?) -> Void) {
+        ParticleBLEExampleGlobals.particleBLEProtocolInstance.clearKnownNetworks() { error in
+            if error != nil {
+                print("clearKnownNetworks error: " + error!.localizedDescription)
+            } else {
+                //nothing!
+            }
+            
+            completionHandler(error)
+        }
+    }
+    
     func requestWiFiAPs() {
         ParticleBLEExampleGlobals.particleBLEProtocolInstance.requestWiFiAPs() { newWifiAPs, error in
             if error == nil {
@@ -99,6 +110,17 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
         ParticleBLEExampleGlobals.particleBLEProtocolInstance.requestJoinWiFiNetwork(network: network, password: password) { error in
             if error != nil {
                 print("connectWithPassword error: " + error!.localizedDescription)
+            }
+            
+            //success!
+            completionHandler(error)
+        }
+    }
+    
+    func connectWithNoPassword(network: Particle_Ctrl_Wifi_ScanNetworksReply.Network, completionHandler: @escaping (_ error: Error?) -> Void) {
+        ParticleBLEExampleGlobals.particleBLEProtocolInstance.requestJoinWiFiNetwork(network: network, password: nil) { error in
+            if error != nil {
+                print("connectWithNoPassword error: " + error!.localizedDescription)
             }
             
             //success!
