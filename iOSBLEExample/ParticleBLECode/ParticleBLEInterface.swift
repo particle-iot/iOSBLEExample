@@ -255,7 +255,7 @@ extension ParticleBLE: CBCentralManagerDelegate {
                     //check the companyID - you should change this on a per product implementation
                     //these defaults are for Particle's tinker implementation
                     assert(companyID == 0x1234)
-                    assert(platformID == 0x0020)
+                    //assert(platformID == 0x0020)
                     //print(setupCode)
                 }
                 catch {
