@@ -10,6 +10,8 @@ import SwiftUI
 
 struct SetupWiFi: View, ParticleBLEObservableDelegate {
     
+    @Environment(\.presentationMode) var presentationMode
+    
     //this is the state of the local UI panel that is selecting the wifi AP from the users perspective
     enum WiFiConnectivityState: Codable {
         case SearchingForDevice
@@ -246,9 +248,11 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
               .onAppear() {
                   //request the wifi list
                   particleBLEObservable.requestCurrentlyConnectedNetwork() { error in
-                      if error == nil {
+                      if (error == nil) && (particleBLEObservable.currentConnectedNetwork.ssid.count > 0) {
                           if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
                               wifiOnboardingState = .Finished
+                              
+                              particleBLEObservable.stopBLE()
                           }
                           else {
                               wifiOnboardingState = .ErrorFailedToJoinNetwork
@@ -266,9 +270,11 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                       //re-request the wifi current connection
                       particleBLEObservable.requestCurrentlyConnectedNetwork() { error in
                           //its possible this can error IF an existing call was still in progress
-                          if error == nil {
+                          if (error == nil) && (particleBLEObservable.currentConnectedNetwork.ssid.count > 0) {
                               if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
                                   wifiOnboardingState = .Finished
+                                  
+                                  particleBLEObservable.stopBLE()
                               }
                               else {
                                   wifiOnboardingState = .ErrorFailedToJoinNetwork
@@ -283,8 +289,10 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
                   //did we connect?!
                   //Note, here you can do additional network rechability tests etc... to validate that a connection is made
                   //You can also check if the device is now talking to the Particle Cloud
-                  if (particleBLEObservable.currentConnectedNetwork != nil) && (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
+                  if (selectedNetwork?.ssid == particleBLEObservable.currentConnectedNetwork.ssid) {
                       wifiOnboardingState = .Finished
+                      
+                      particleBLEObservable.stopBLE()
                   }
               }
           }
@@ -307,5 +315,18 @@ struct SetupWiFi: View, ParticleBLEObservableDelegate {
               Text("Error deleting known networks!")
           }
       }
+      .navigationBarBackButtonHidden(true)
+      .navigationBarItems(leading: Button(action: {
+          
+          //if the ble is activate, terminate now
+          particleBLEObservable.stopBLE()
+          
+          self.presentationMode.wrappedValue.dismiss()
+      }) {
+          HStack {
+              Image(systemName: "chevron.left")
+              Text("Back")
+          }
+      })
     }
 }

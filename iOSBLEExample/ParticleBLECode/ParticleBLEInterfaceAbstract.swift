@@ -61,6 +61,10 @@ public class ParticleBLEInterfaceAbstract : NSObject {
         assert( false )
     }
     
+    func disconnect() {
+        assert( false )
+    }
+    
     func sendBuffer(buffer: [UInt8]) {
         assert( false )
     }

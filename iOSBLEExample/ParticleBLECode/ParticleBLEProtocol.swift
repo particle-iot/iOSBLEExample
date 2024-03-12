@@ -111,6 +111,19 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
     func startup(bleName: String, mobileSecret: String, completionHandler: @escaping () -> Void) {
         self.mobileSecret = mobileSecret
         
+        protocolState = .disconnected;
+        //ecjpake = ecJPAKE();
+        
+        //reset all the fields
+        wifiAPCompletionHandler = nil;
+        currentConnectedAPCompletionHandler = nil;
+        requestJoinNetworkCompletionHandler = nil;
+        clearKnownNetworksCompletionHandler = nil;
+        requestEchoCompletionHandler = nil;
+        nextReqID = 32;
+        reqIDToTypeDict = [:];
+        //receivingData = nil;
+        
         do {
             try ecjpake.initialize(role: .client, sharedSecret: [UInt8](mobileSecret.utf8))
         }
@@ -363,6 +376,8 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
                         do {
                             let _: Particle_Ctrl_Wifi_JoinNewNetworkReply = try Particle_Ctrl_Wifi_JoinNewNetworkReply(serializedData: Data(decodedMessage.payload))
                             
+                            print("Particle_Ctrl_Wifi_JoinNewNetworkReply: \(decodedMessage.result)")
+                            
                             //if the result is not 0, we failed to join the network
                             if decodedMessage.result != 0 {
                                 joinNetworkError = ParticleBLEProtocolError.failedToJoinNetwork
@@ -459,7 +474,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
             let dataToDec: [UInt8] = Array(buffer[Int(MESSAGE_HEADER_SIZE)...Int(buffer.count - SECURITY_PACKET_OVERHEAD - 1)])
             let aesTag: [UInt8] = Array(buffer[Int(buffer.count - SECURITY_PACKET_OVERHEAD)...Int(buffer.count-1)])
             
-            var decryptedData = ecjpake.decryptData(payload: dataToDec, additionalData: messageHeader, aesTag: aesTag)
+            let decryptedData = ecjpake.decryptData(payload: dataToDec, additionalData: messageHeader, aesTag: aesTag)
             
             //re-assemble the decrypted message
             workingBuffer = messageHeader + decryptedData + aesTag
@@ -486,7 +501,7 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         var txBuf: ByteBuffer! = allocator.buffer(capacity: data.count + 2)
         
         var messageLength: UInt16 = UInt16(data.count)
-        var messageHeader = withUnsafeBytes(of: &messageLength) { Array($0) }
+        let messageHeader = withUnsafeBytes(of: &messageLength) { Array($0) }
         
         txBuf.writeBytes(messageHeader)
         txBuf.writeBytes(data)
@@ -533,12 +548,20 @@ public class ParticleBLEProtocol : ParticleBLEStatusDelegate, ParticleBLEInterfa
         
         //encrypt the packet
         if SUPPORT_SECURITY {
-            var (encryptedData, aesTag) = ecjpake.encryptData(payload: bufRequestHeader.getBytes(at: 0, length: bufRequestHeader.readableBytes) ?? [], additionalData: messageHeader)
+            let (encryptedData, aesTag) = ecjpake.encryptData(payload: bufRequestHeader.getBytes(at: 0, length: bufRequestHeader.readableBytes) ?? [], additionalData: messageHeader)
             
             txBuf.writeBytes(encryptedData)
             txBuf.writeBytes(aesTag)
         } else {
             txBuf.writeBytes( bufRequestHeader.getBytes(at: 0, length: bufRequestHeader.readableBytes) ?? [])
+        }
+
+        //Debug only - can be removed
+        let byteArray = txBuf.getBytes(at: 0, length: txBuf.readableBytes)
+        
+        if let byteArray2 = byteArray {
+            let hexString = byteArray2.map { String(format: "%02X", $0) }.joined( separator: "")
+            print("> \(hexString) (\(byteArray!.count) bytes)")
         }
         
         bleInterface.sendBuffer(buffer: txBuf.getBytes(at: 0, length: txBuf.readableBytes) ?? [])

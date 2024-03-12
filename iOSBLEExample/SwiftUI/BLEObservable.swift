@@ -130,6 +130,9 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
 
     func requestCurrentlyConnectedNetwork(completionHandler: @escaping (_ error: Error?) -> Void) {
         ParticleBLEExampleGlobals.particleBLEProtocolInstance.requestCurrentNetwork() { currentConnectedAP, error in
+            
+            print("requestCurrentlyConnectedNetwork \(String(describing: currentConnectedAP?.ssid))");
+            
             if error != nil {
                 print("requestCurrentlyConnectedNetwork error: " + error!.localizedDescription)
             } else {
@@ -184,5 +187,9 @@ class ParticleBLEObservable: ObservableObject, ParticleBLEProtocolStatusDelegate
             //happen to call it here immediatly
             ParticleBLEExampleGlobals.particleBLEInstance.startConnectionProcess()
         }
+    }
+    
+    func stopBLE() {
+        ParticleBLEExampleGlobals.particleBLEInstance.disconnect();
     }
 }

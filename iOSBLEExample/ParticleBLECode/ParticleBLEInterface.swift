@@ -56,6 +56,14 @@ class ParticleBLE: ParticleBLEInterfaceAbstract {
     func startConnectionProcess() {
         updateState(state: .lookingForDevice)
     }
+    
+    override func disconnect() {
+        if self.state == .connected {
+            self.centralManager!.cancelPeripheralConnection(self.peripheral!)
+            
+            updateState(state: .lookingForDevice)
+        }
+    }
 
     ///
     /// Private functions
@@ -177,7 +185,12 @@ class ParticleBLE: ParticleBLEInterfaceAbstract {
         var currentOffset = 0
         var currentMaxLimit = min( maxPacketSize!, bufferSize )
         
+        print("BLE sendBuffer: \(buffer.count)")
+        
         while bufferSize != 0 {
+            
+            print("BLE sendBuffer Chunk: \(currentOffset) \(currentMaxLimit)")
+            
             peripheral?.writeValue(Data(buffer[currentOffset...(currentMaxLimit-1)]), for: rxCharacteristic!, type: .withoutResponse)
             
             let dataJustSent = (currentMaxLimit - currentOffset)
@@ -218,6 +231,11 @@ extension ParticleBLE: CBCentralManagerDelegate {
 
     func getManufacturingData( advertisementData: [String: Any] ) throws -> (companyID: UInt16, platformID: UInt16, setupCode: String) {
         //did we find our peripheral? our peripheral has manufacturing data!
+        
+        var companyID: UInt16 = 0
+        var platformID: UInt16 = 0
+        var setupCode: String = ""
+        
         if let manufacturerData = advertisementData["kCBAdvDataManufacturerData"] as? Data {
             assert(manufacturerData.count == (2 + 2 + 6))
             
@@ -226,20 +244,17 @@ extension ParticleBLE: CBCentralManagerDelegate {
             buf = allocator.buffer(capacity: manufacturerData.count)
             buf.writeBytes(Array(manufacturerData))
             
-            let companyID: UInt16 = buf.readInteger(endianness: .little)!
+            companyID = buf.readInteger(endianness: .little)!
             //print("companyID", String(format: "%04X", companyID))
             
-            let platformID: UInt16 = buf.readInteger(endianness: .little)!
+            platformID = buf.readInteger(endianness: .little)!
             //print("platformID", String(format: "%04X", platformID))
             
-            let setupCode: String = buf.readString(length: 6)!
+            setupCode = buf.readString(length: 6)!
             //print("setupCode: \(setupCode)")
-            
-            return (companyID, platformID, setupCode )
         }
-        
-        assert( false )
-        //throw "No manufacturing data"
+
+        return (companyID, platformID, setupCode )
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
@@ -250,7 +265,8 @@ extension ParticleBLE: CBCentralManagerDelegate {
             
             if name.contains(bleName) {
                 do {
-                    let (companyID, platformID, setupCode) = try getManufacturingData( advertisementData: advertisementData )
+                    //
+                    let (companyID, _, _) = try getManufacturingData( advertisementData: advertisementData )
                     
                     //check the companyID - you should change this on a per product implementation
                     //these defaults are for Particle's tinker implementation

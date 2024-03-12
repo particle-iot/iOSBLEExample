@@ -92,15 +92,24 @@ public class ecJPAKE {
         counterRandomByteGeneratorAlloc = UnsafeMutablePointer<mbedtls_ctr_drbg_context>.allocate(capacity: 1)
         entropyAlloc = UnsafeMutablePointer<mbedtls_entropy_context>.allocate(capacity: 1)
         aesAlloc = UnsafeMutablePointer<mbedtls_ccm_context>.allocate(capacity: 1)
+    }
+    
+    func initialize(role: Role, sharedSecret: [UInt8]) throws {
+        self.role = role
+        
+        self.reqCount = 0
+        self.repCount = 0
+        self.reqNonce = []
+        self.repNonce = []
+        self.sessionSecret = []
+        self.confirmationKey = []
+        
+        self.hash = Sha256();
         
         mbedtls_ecjpake_init(jpakeContextAlloc!)
         mbedtls_ctr_drbg_init(counterRandomByteGeneratorAlloc!)
         mbedtls_entropy_init(entropyAlloc!)
         mbedtls_ccm_init(aesAlloc!)
-    }
-    
-    func initialize(role: Role, sharedSecret: [UInt8]) throws {
-        self.role = role
         
         let sharedSecretPointer = UnsafeMutablePointer<UInt8>.allocate(capacity: sharedSecret.count)
         sharedSecretPointer.initialize(from: sharedSecret, count: sharedSecret.count)
@@ -299,10 +308,10 @@ public class ecJPAKE {
                     hmacConfirmation.update(data: Array<UInt8>("client".utf8))
                     hmacConfirmation.update(data: Array<UInt8>("server".utf8))
                     hmacConfirmation.update(data: interimPacketHash)
-                    let confirmationPacket = hmacConfirmation.finish()
-                    
+
+                    //let confirmationPacket = hmacConfirmation.
                     //assert( packet == confirmationPacket )
-                    
+
                     state = .done
                     
                     initAESCCM()
