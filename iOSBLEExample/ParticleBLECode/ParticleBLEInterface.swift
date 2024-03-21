@@ -60,9 +60,10 @@ class ParticleBLE: ParticleBLEInterfaceAbstract {
     override func disconnect() {
         if self.state == .connected {
             self.centralManager!.cancelPeripheralConnection(self.peripheral!)
-            
-            updateState(state: .lookingForDevice)
         }
+
+        //always go back to idle
+        updateState(state: .idle)
     }
 
     ///
@@ -270,7 +271,7 @@ extension ParticleBLE: CBCentralManagerDelegate {
                     
                     //check the companyID - you should change this on a per product implementation
                     //these defaults are for Particle's tinker implementation
-                    assert(companyID == 0x1234)
+                    //assert(companyID == 0x1234)
                     //assert(platformID == 0x0020)
                     //print(setupCode)
                 }
